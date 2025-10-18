@@ -1,0 +1,3 @@
+[submodule "crobots++/lib/SDL"]
+	path = crobots++/lib/SDL
+	url = https://github.com/libsdl-org/SDL
