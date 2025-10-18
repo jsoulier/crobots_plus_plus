@@ -18,36 +18,75 @@ namespace crobots
 {
 
 class Degrees;
+class Feet;
+class Meters;
 class Radians;
 
-struct Degrees
+class Meters
 {
+    friend class Feet;
+
+public:
+    Meters() = default;
+    explicit Meters(float value);
+    explicit Meters(const Feet& feet);
+    float GetValue() const;
+
+private:
+    float Value;
+};
+
+class Feet
+{
+    friend class Meters;
+
+public:
+    Feet() = default;
+    explicit Feet(float value);
+    explicit Feet(const Meters& meters);
+    float GetValue() const;
+
+private:
+    float Value;
+};
+
+class Degrees
+{
+    friend class Radians;
+
+public:
     Degrees() = default;
     explicit Degrees(float value);
     explicit Degrees(const Radians& radians);
-    operator float() const;
+    float GetValue() const;
 
+private:
     float Value;
 };
 
-struct Radians
+class Radians
 {
+    friend class Degrees;
+
+public:
     Radians() = default;
     explicit Radians(float value);
     explicit Radians(const Degrees& degrees);
-    operator float() const;
+    float GetValue() const;
 
+private:
     float Value;
-};
-
-enum class Upgrade
-{
 };
 
 class IRobot
 {
 public:
+    IRobot() = default;
+    virtual ~IRobot() = default;
+    virtual void Update() = 0;
 
+protected:
+    Meters Scan(Radians angle, Radians width);
 };
 
 }

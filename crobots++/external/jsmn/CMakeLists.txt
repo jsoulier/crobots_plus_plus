@@ -1,0 +1,3 @@
+project(jsmn)
+add_library(jsmn INTERFACE)
+target_include_directories(jsmn INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
