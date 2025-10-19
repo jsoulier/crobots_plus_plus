@@ -2,6 +2,8 @@
 
 #include <crobots++/crobots++.hpp>
 
+#include <string_view>
+
 using namespace crobots;
 
-IRobot* ApiLoad();
+IRobot* ApiLoadRobot(const std::string_view& string);

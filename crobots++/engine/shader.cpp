@@ -4,12 +4,14 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <iterator>
 #include <string>
 #include <string_view>
 
+#include "log.hpp"
 #include "shader.hpp"
 
 static void* Load(SDL_GPUDevice* device, const std::string_view& name)
@@ -39,18 +41,18 @@ static void* Load(SDL_GPUDevice* device, const std::string_view& name)
     {
         assert(false);
     }
-    std::string shaderPath = std::format("{}.{}", name, suffix);
-    std::ifstream shaderFile(shaderPath, std::ios::binary);
+    std::filesystem::path path = SDL_GetBasePath();
+    path /= name;
+    std::ifstream shaderFile(path.replace_filename(suffix), std::ios::binary);
     if (shaderFile.fail())
     {
-        SDL_Log("Failed to open shader: %s", shaderPath.data());
+        Log(std::format("Failed to open shader: {}", path.string()));
         return nullptr;
     }
-    std::string jsonPath = std::format("{}.json", name);
-    std::ifstream jsonFile(jsonPath, std::ios::binary);
+    std::ifstream jsonFile(path.replace_extension(".json"), std::ios::binary);
     if (jsonFile.fail())
     {
-        SDL_Log("Failed to open json: %s", jsonPath.data());
+        Log(std::format("Failed to open json: {}", path.string()));
         return nullptr;
     }
     std::string shaderData(std::istreambuf_iterator<char>(shaderFile), {});
@@ -60,7 +62,7 @@ static void* Load(SDL_GPUDevice* device, const std::string_view& name)
     jsmn_init(&parser);
     if (jsmn_parse(&parser, jsonData.data(), jsonData.size(), tokens, 19) <= 0)
     {
-        SDL_Log("Failed to parse json: %s", jsonPath.data());
+        Log(std::format("Failed to parse json: {}", path.string()));
         return nullptr;
     }
     void* shader = nullptr;
@@ -71,7 +73,7 @@ static void* Load(SDL_GPUDevice* device, const std::string_view& name)
         {
             if (tokens[i].type != JSMN_STRING)
             {
-                SDL_Log("Bad json type: %s", jsonPath.data());
+                Log(std::format("Bad json type: {}", path.string()));
                 return nullptr;
             }
             char* keyString = jsonData.data() + tokens[i + 0].start;
@@ -133,7 +135,7 @@ static void* Load(SDL_GPUDevice* device, const std::string_view& name)
         {
             if (tokens[i].type != JSMN_STRING)
             {
-                SDL_Log("Bad json type: %s", jsonPath.data());
+                Log(std::format("Bad json type: {}", path.string()));
                 return nullptr;
             }
             char* keyString = jsonData.data() + tokens[i + 0].start;
@@ -178,7 +180,7 @@ static void* Load(SDL_GPUDevice* device, const std::string_view& name)
     }
     if (!shader)
     {
-        SDL_Log("Failed to create shader: %s, %s", name.data(), SDL_GetError());
+        Log(std::format("Failed to create shader: {}, {}", name, SDL_GetError()));
         return nullptr;
     }
     return shader;

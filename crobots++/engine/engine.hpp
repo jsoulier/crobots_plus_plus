@@ -1,9 +1,14 @@
 #pragma once
 
-struct EngineData
-{
+#include <vector>
+#include <string>
 
+#include "api.hpp"
+
+struct EngineParameters
+{
+    std::vector<std::string> Robots;
 };
 
-bool EngineInit();
+bool EngineInit(const EngineParameters& parameters);
 void EngineQuit();

@@ -6,6 +6,10 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/crobots++.exe",
+            "args": [
+                "--robots",
+                "up_down",
+            ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "CMake: build"
         },
