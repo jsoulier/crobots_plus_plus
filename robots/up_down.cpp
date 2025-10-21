@@ -1,6 +1,6 @@
 #include <crobots++/crobots++.hpp>
 
-class UpDownRobot : public crobots::IRobot
+class UpDownRobot : public IRobot
 {
 public:
     void Update() override
@@ -8,4 +8,4 @@ public:
     }
 };
 
-CROBOTS_ROBOT(UpDownRobot)
+ROBOT(UpDownRobot)

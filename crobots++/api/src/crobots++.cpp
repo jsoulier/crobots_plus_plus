@@ -1,8 +1,5 @@
 #include <crobots++/crobots++.hpp>
 
-namespace crobots
-{
-
 Meters::Meters(float value)
     : Value{value}
 {
@@ -63,4 +60,58 @@ float Radians::GetValue() const
     return Value;
 }
 
+IRobot::IRobot()
+{
+}
+
+void IRobot::SetSpeed(MetersPerSecond speed)
+{
+}
+
+MetersPerSecond IRobot::GetSpeed()
+{
+    return {};
+}
+
+Radians IRobot::GetRotation()
+{
+    return Radians{0.0f};
+}
+
+Meters IRobot::GetX()
+{
+    return Meters{0.0f};
+}
+
+Meters IRobot::GetY()
+{
+    return Meters{0.0f};
+}
+
+void IRobot::Fire(Radians radians, Meters range)
+{
+}
+
+std::optional<Meters> IRobot::Scan(Radians angle, Radians width)
+{
+    return {};
+}
+
+Celsius IRobot::GetHeat()
+{
+    return {};
+}
+
+void IRobot::CoolDown()
+{
+}
+
+float IRobot::GetDamage()
+{
+    return 0.0f;
+}
+
+Seconds IRobot::GetTime()
+{
+    return {};
 }

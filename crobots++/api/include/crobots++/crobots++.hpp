@@ -1,21 +1,20 @@
 #pragma once
 
+#include <optional>
+
 #if defined(_WIN32)
-#define CROBOTS_ENTRYPOINT extern "C" __declspec(dllexport)
+#define ROBOT_ENTRYPOINT extern "C" __declspec(dllexport)
 #elif defined(__GNUC__) || defined(__clang__)
-#define CROBOTS_ENTRYPOINT extern "C" __attribute__((visibility("default")))
+#define ROBOT_ENTRYPOINT extern "C" __attribute__((visibility("default")))
 #else
-#define CROBOTS_ENTRYPOINT extern "C"
+#define ROBOT_ENTRYPOINT extern "C"
 #endif
 
-#define CROBOTS_ROBOT(T) \
-    CROBOTS_ENTRYPOINT ::crobots::IRobot* NewRobot() \
+#define ROBOT(T) \
+    ROBOT_ENTRYPOINT IRobot* NewRobot() \
     { \
         return new T(); \
     } \
-
-namespace crobots
-{
 
 class Degrees;
 class Feet;
@@ -78,15 +77,49 @@ private:
     float Value;
 };
 
-class IRobot
+class Seconds
 {
-public:
-    IRobot() = default;
-    virtual ~IRobot() = default;
-    virtual void Update() = 0;
 
-protected:
-    Meters Scan(Radians angle, Radians width);
 };
 
-}
+class Celsius
+{
+
+};
+
+template<typename NumT, typename DenT>
+struct Ratio
+{
+
+};
+
+using MetersPerSecond = Ratio<Meters, Seconds>;
+using FeetPerSecond = Ratio<Feet, Seconds>;
+
+class IRobot
+{
+protected:
+    IRobot();
+
+public:
+    IRobot(const IRobot& other) = delete;
+    IRobot& operator=(const IRobot& other) = delete;
+    IRobot(IRobot&& other) = delete;
+    IRobot& operator=(IRobot&& other) = delete;
+    ~IRobot() = default;
+    virtual void Update() = 0;
+    void SetSpeed(MetersPerSecond speed);
+    MetersPerSecond GetSpeed();
+    Radians GetRotation();
+    Meters GetX();
+    Meters GetY();
+    void Fire(Radians radians, Meters range);
+    std::optional<Meters> Scan(Radians angle, Radians width);
+    Celsius GetHeat();
+    void CoolDown();
+    float GetDamage();
+    Seconds GetTime();
+
+private:
+    Seconds TimeSlice;
+};
