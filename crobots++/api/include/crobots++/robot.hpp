@@ -5,29 +5,23 @@
 #include <optional>
 
 #if defined(_WIN32)
-#define ROBOT_ENTRYPOINT extern "C" __declspec(dllexport)
+#define CROBOTS_ENTRYPOINT extern "C" __declspec(dllexport)
 #elif defined(__GNUC__) || defined(__clang__)
-#define ROBOT_ENTRYPOINT extern "C" __attribute__((visibility("default")))
+#define CROBOTS_ENTRYPOINT extern "C" __attribute__((visibility("default")))
 #else
-#define ROBOT_ENTRYPOINT extern "C"
+#define CROBOTS_ENTRYPOINT extern "C"
 #endif
 
-#define ROBOT(T) \
-    ROBOT_ENTRYPOINT ::crobots::IRobot* NewRobot(::crobots::RobotContext* context) \
+#define CROBOTS_ROBOT(T) \
+    CROBOTS_ENTRYPOINT crobots::IRobot* NewRobot(crobots::RobotContext* context) \
     { \
-        return ::crobots::IRobot::Create<T>(context); \
+        return crobots::IRobot::Create<T>(context); \
     } \
 
 namespace crobots
 {
 
-struct RobotContext
-{
-    Meters X;
-    Meters Y;
-    Radians Rotation;
-};
-
+class RobotContext;
 class IRobot
 {
 protected:

@@ -8,4 +8,4 @@ public:
     }
 };
 
-ROBOT(UpDownRobot)
+CROBOTS_ROBOT(UpDownRobot)

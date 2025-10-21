@@ -1,14 +1,15 @@
-#include <crobots++/robot.hpp>
-
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <box2d/box2d.h>
+#include <crobots++/internal.hpp>
+#include <crobots++/robot.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "buffer.hpp"
@@ -37,6 +38,7 @@ struct Projectile
 
 static SDL_Window* window;
 static SDL_GPUDevice* device;
+static SDL_GPUTexture* depthTexture;
 static SDL_GPUGraphicsPipeline* cubePipeline;
 static SDL_GPUBuffer* cubeBuffer;
 static DynamicBuffer<Instance> instanceBuffer;
@@ -143,6 +145,61 @@ static void Draw()
         SDL_SubmitGPUCommandBuffer(commandBuffer);
         return;
     }
+    if (camera.GetWidth() != width || camera.GetHeight() != height)
+    {
+        SDL_ReleaseGPUTexture(device, depthTexture);
+        SDL_GPUTextureCreateInfo info{};
+        info.format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+        info.type = SDL_GPU_TEXTURETYPE_2D;
+        info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+        info.width = width;
+        info.height = height;
+        info.layer_count_or_depth = 1;
+        info.num_levels = 1;
+        depthTexture = SDL_CreateGPUTexture(device, &info);
+        if (!depthTexture)
+        {
+            SDL_Log("Failed to create depth texture: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(commandBuffer);
+            return;
+        }
+        camera.SetSize(width, height);
+    }
+    for (Robot& robot : robots)
+    {
+        // TODO: b2Body
+        instanceBuffer.Emplace(device, glm::mat4(1.0f));
+    }
+    instanceBuffer.Upload(device, commandBuffer);
+    camera.Update();
+    if (instanceBuffer.GetSize())
+    {
+        SDL_GPUColorTargetInfo colorInfo{};
+        SDL_GPUDepthStencilTargetInfo depthInfo{};
+        colorInfo.texture = swapchainTexture;
+        colorInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        colorInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.texture = depthTexture;
+        depthInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.clear_depth = 1.0f;
+        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, &depthInfo);
+        if (!renderPass)
+        {
+            SDL_Log("Failed to begin render pass: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(commandBuffer);
+            return;
+        }
+        SDL_GPUBufferBinding vertexBuffers[2]{};
+        vertexBuffers[0].buffer = cubeBuffer;
+        vertexBuffers[1].buffer = instanceBuffer.GetBuffer();
+        SDL_BindGPUGraphicsPipeline(renderPass, cubePipeline);
+        SDL_BindGPUVertexBuffers(renderPass, 0, vertexBuffers, 2);
+        SDL_PushGPUVertexUniformData(commandBuffer, 0, &camera.GetViewProj(), 64);
+        SDL_DrawGPUPrimitives(renderPass, 36, instanceBuffer.GetSize(), 0, 0);
+        SDL_EndGPURenderPass(renderPass);
+    }
     SDL_SubmitGPUCommandBuffer(commandBuffer);
 }
 
@@ -167,11 +224,21 @@ int main(int argc, char** argv)
             case SDL_EVENT_QUIT:
                 running = false;
                 break;
+            case SDL_EVENT_MOUSE_MOTION:
+                if (event.motion.state & SDL_BUTTON_LMASK)
+                {
+                    camera.Drag(event.motion.xrel, event.motion.yrel);
+                }
+                break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                camera.Scroll(event.wheel.y);
+                break;
             }
         }
         Draw();
     }
     instanceBuffer.Destroy(device);
+    SDL_ReleaseGPUTexture(device, depthTexture);
     SDL_ReleaseGPUBuffer(device, cubeBuffer);
     SDL_ReleaseGPUGraphicsPipeline(device, cubePipeline);
     SDL_ReleaseWindowFromGPUDevice(device, window);

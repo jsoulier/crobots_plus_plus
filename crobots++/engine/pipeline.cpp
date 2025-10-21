@@ -30,7 +30,7 @@ SDL_GPUGraphicsPipeline* CreateCubePipeline(SDL_GPUDevice* device, SDL_Window* w
     attribs[0].buffer_slot = 0;
     attribs[1].location = 1;
     attribs[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    attribs[1].offset = 0;
+    attribs[1].offset = sizeof(float) * 3;
     attribs[1].buffer_slot = 0;
     attribs[2].location = 2;
     attribs[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;

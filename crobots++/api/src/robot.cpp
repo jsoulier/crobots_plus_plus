@@ -1,3 +1,4 @@
+#include <crobots++/internal.hpp>
 #include <crobots++/robot.hpp>
 
 namespace crobots

@@ -6,7 +6,7 @@
 #include <cmath>
 #include <utility>
 
-template<typename T, SDL_GPUBufferUsageFlags U = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ>
+template<typename T, SDL_GPUBufferUsageFlags U = SDL_GPU_BUFFERUSAGE_VERTEX>
 class DynamicBuffer
 {
 public:
@@ -122,6 +122,18 @@ public:
         region.size = size * sizeof(T);
         SDL_UploadToGPUBuffer(copyPass, &location, &region, true);
         BufferSize = size;
+    }
+
+    void Upload(SDL_GPUDevice* device, SDL_GPUCommandBuffer* commandBuffer)
+    {
+        SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commandBuffer);
+        if (!copyPass)
+        {
+            SDL_Log("Failed to begin copy pass: %s", SDL_GetError());
+            return;
+        }
+        Upload(device, copyPass);
+        SDL_EndGPUCopyPass(copyPass);
     }
 
     SDL_GPUBuffer* GetBuffer() const

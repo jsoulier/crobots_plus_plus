@@ -19,7 +19,7 @@ struct Output
 Output main(Input input)
 {
     Output output;
-    output.Position = mul(mul(float4(input.Position, 1.0f), input.Transform), ViewProj);
+    output.Position = mul(ViewProj, mul(input.Transform, float4(input.Position, 1.0f)));
     output.Normal = mul(input.Normal, (float3x3) input.Transform);
     return output;
 }

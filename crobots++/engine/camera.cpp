@@ -1,5 +1,7 @@
+#define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -24,8 +26,8 @@ Camera::Camera()
     , RotateSpeed{1.0f}
     , ZoomSpeed{1.0f}
     , Fov{glm::radians(60.0f)}
-    , Near{0.0f}
-    , Far{0.0f}
+    , Near{0.1f}
+    , Far{100.0f}
 {
     SetRotation(0.0f, 0.0f);
 }
@@ -36,7 +38,10 @@ void Camera::Update()
     switch (Type)
     {
     case CameraType::TopDown:
-        proj = glm::ortho(-Width / 2, Width / 2, Height / 2, -Height / 2);
+        float width = Width / 100.0f;
+        float height = Height / 100.0f;
+        proj = glm::ortho(-width, width, height, -height, 0.0f, Far);
+        // proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
         break;
     }
     glm::mat4 view = glm::lookAt(Position, Position + Forward, kUp);
@@ -46,6 +51,11 @@ void Camera::Update()
 void Camera::SetType(CameraType type)
 {
     Type = type;
+    switch (Type)
+    {
+    case CameraType::TopDown:
+        break;
+    }
 }
 
 void Camera::SetRotation(float pitch, float yaw)
@@ -56,7 +66,7 @@ void Camera::SetRotation(float pitch, float yaw)
     Forward.y = std::sin(Pitch);
     Forward.z = std::cos(Pitch) * std::sin(Yaw);
     Forward = glm::normalize(Forward);
-    Right = glm::cross(Forward, Up);
+    Right = glm::cross(Up, Forward);
     Right = glm::normalize(Right);
     Up = glm::cross(Forward, Right);
     Up = glm::normalize(Up);
@@ -77,7 +87,7 @@ void Camera::Scroll(float delta)
     switch (Type)
     {
     case CameraType::TopDown:
-        Position.z += delta * ZoomSpeed;
+        Position += Forward * delta * ZoomSpeed;
         break;
     }
 }
@@ -87,8 +97,8 @@ void Camera::Drag(float dx, float dy)
     switch (Type)
     {
     case CameraType::TopDown:
-        Position.x += dx * MoveSpeed;
-        Position.y += dy * MoveSpeed;
+        Position += Right * dx * MoveSpeed;
+        Position += Up * dy * MoveSpeed;
         break;
     }
 }

@@ -6,7 +6,7 @@ namespace crobots
 {
 
 class IRobot;
-struct RobotContext;
+class RobotContext;
 
 }
 
