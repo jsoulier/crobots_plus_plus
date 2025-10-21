@@ -15,7 +15,10 @@ add_subdirectory(crobots++/external/SDL)
 add_subdirectory(crobots++/external/box2d)
 add_subdirectory(crobots++/external/glm)
 add_subdirectory(crobots++/external/jsmn)
-add_library(api crobots++/api/src/crobots++.cpp)
+add_library(api
+    crobots++/api/src/math.cpp
+    crobots++/api/src/robot.cpp
+)
 set_target_properties(api PROPERTIES CXX_STANDARD 23)
 target_include_directories(api PUBLIC crobots++/api/include)
 file(GLOB ROBOTS robots/*.cpp)
@@ -26,8 +29,10 @@ foreach(PATH ${ROBOTS})
     target_link_libraries(${NAME} PRIVATE api)
 endforeach()
 add_executable(engine WIN32
+    crobots++/engine/camera.cpp
     crobots++/engine/main.cpp
     crobots++/engine/mesh.cpp
+    crobots++/engine/pipeline.cpp
     crobots++/engine/robot.cpp
     crobots++/engine/shader.cpp
 )
@@ -48,11 +53,11 @@ target_precompile_headers(engine PRIVATE
 
 function(add_shader FILE)
     set(DEPENDS ${ARGN})
-    set(HLSL ${CMAKE_SOURCE_DIR}/shaders/${FILE})
-    set(SPV ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.spv)
-    set(DXIL ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.dxil)
-    set(MSL ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.msl)
-    set(JSON ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.json)
+    set(HLSL ${CMAKE_SOURCE_DIR}/crobots++/shaders/${FILE})
+    set(SPV ${CMAKE_SOURCE_DIR}/crobots++/shaders/bin/${FILE}.spv)
+    set(DXIL ${CMAKE_SOURCE_DIR}/crobots++/shaders/bin/${FILE}.dxil)
+    set(MSL ${CMAKE_SOURCE_DIR}/crobots++/shaders/bin/${FILE}.msl)
+    set(JSON ${CMAKE_SOURCE_DIR}/crobots++/shaders/bin/${FILE}.json)
     if(MSVC)
         set(SHADERCROSS crobots++/external/SDL_shadercross/msvc/shadercross.exe)
     endif()
@@ -68,7 +73,7 @@ function(add_shader FILE)
         string(REPLACE . _ NAME ${NAME})
         set(NAME compile_${NAME})
         add_custom_target(${NAME} DEPENDS ${OUTPUT})
-        add_dependencies(crobots++ ${NAME})
+        add_dependencies(engine ${NAME})
     endfunction()
     if (MSVC)
         compile(${SPV})
@@ -89,7 +94,7 @@ function(add_shader FILE)
         string(REPLACE . _ NAME ${NAME})
         set(NAME package_${NAME})
         add_custom_target(${NAME} DEPENDS ${BINARY})
-        add_dependencies(crobots++ ${NAME})
+        add_dependencies(engine ${NAME})
     endfunction()
     if(APPLE)
         package(${MSL})
@@ -98,3 +103,5 @@ function(add_shader FILE)
     endif()
     package(${JSON})
 endfunction()
+add_shader(cube.frag)
+add_shader(cube.vert)

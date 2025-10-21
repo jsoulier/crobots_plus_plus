@@ -2,6 +2,12 @@
 
 #include <string_view>
 
-class IRobot;
+namespace crobots
+{
 
-IRobot* LoadRobot(const std::string_view& name);
+class IRobot;
+struct RobotContext;
+
+}
+
+crobots::IRobot* LoadRobot(const std::string_view& name, crobots::RobotContext* context);

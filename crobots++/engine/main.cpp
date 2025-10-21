@@ -1,20 +1,32 @@
+#include <crobots++/robot.hpp>
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <box2d/box2d.h>
-#include <crobots++/crobots++.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "buffer.hpp"
+#include "camera.hpp"
 #include "mesh.hpp"
+#include "pipeline.hpp"
 #include "robot.hpp"
 #include "shader.hpp"
 
+struct Instance
+{
+    glm::mat4 Matrix;
+};
+
 struct Robot
 {
-    std::unique_ptr<IRobot> Interface;
+    std::unique_ptr<crobots::IRobot> Interface;
+    crobots::RobotContext Context;
     b2BodyId BodyId;
 };
 
@@ -25,7 +37,10 @@ struct Projectile
 
 static SDL_Window* window;
 static SDL_GPUDevice* device;
+static SDL_GPUGraphicsPipeline* cubePipeline;
 static SDL_GPUBuffer* cubeBuffer;
+static DynamicBuffer<Instance> instanceBuffer;
+static Camera camera;
 static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
 
@@ -44,7 +59,7 @@ static bool Parse(int argc, char** argv)
                     break;
                 }
                 Robot robot;
-                robot.Interface.reset(LoadRobot(inner));
+                robot.Interface.reset(LoadRobot(inner, &robot.Context));
                 if (!robot.Interface)
                 {
                     continue;
@@ -93,6 +108,12 @@ static bool Init()
     if (!cubeBuffer)
     {
         SDL_Log("Failed to create cube buffer");
+        return false;
+    }
+    cubePipeline = CreateCubePipeline(device, window);
+    if (!cubePipeline)
+    {
+        SDL_Log("Failed to create cube pipeline");
         return false;
     }
     return true;
@@ -150,7 +171,9 @@ int main(int argc, char** argv)
         }
         Draw();
     }
+    instanceBuffer.Destroy(device);
     SDL_ReleaseGPUBuffer(device, cubeBuffer);
+    SDL_ReleaseGPUGraphicsPipeline(device, cubePipeline);
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);
     SDL_Quit();

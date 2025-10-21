@@ -1,13 +1,14 @@
 #include <SDL3/SDL.h>
 
+#include <filesystem>
 #include <string_view>
 
 #include "robot.hpp"
 
 static constexpr const char* kNewRobot = "NewRobot";
-using NewRobotFunction = IRobot*(*)();
+using NewRobotFunction = crobots::IRobot*(*)(crobots::RobotContext* context);
 
-IRobot* LoadRobot(const std::string_view& name)
+crobots::IRobot* LoadRobot(const std::string_view& name, crobots::RobotContext* context)
 {
     std::filesystem::path path = SDL_GetBasePath();
     path /= name;
@@ -31,7 +32,7 @@ IRobot* LoadRobot(const std::string_view& name)
         SDL_UnloadObject(object);
         return nullptr;
     }
-    IRobot* robot = function();
+    crobots::IRobot* robot = function(context);
     if (!robot)
     {
         SDL_Log("Failed to create robot: %s, %s", name.data(), SDL_GetError());
