@@ -45,6 +45,7 @@ static DynamicBuffer<Instance> instanceBuffer;
 static Camera camera;
 static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
+static b2WorldId worldId;
 
 static bool Parse(int argc, char** argv)
 {
@@ -117,6 +118,15 @@ static bool Init()
     {
         SDL_Log("Failed to create cube pipeline");
         return false;
+    }
+    {
+        b2WorldDef worldDef = b2DefaultWorldDef();
+        worldId = b2CreateWorld(&worldDef);
+        if (B2_IS_NULL(worldId))
+        {
+            SDL_Log("Failed to create box2d world");
+            return false;
+        }
     }
     return true;
 }
@@ -237,6 +247,7 @@ int main(int argc, char** argv)
         }
         Draw();
     }
+    b2DestroyWorld(worldId);
     instanceBuffer.Destroy(device);
     SDL_ReleaseGPUTexture(device, depthTexture);
     SDL_ReleaseGPUBuffer(device, cubeBuffer);

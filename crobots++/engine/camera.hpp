@@ -14,7 +14,6 @@ public:
     void Update();
     void SetType(CameraType type);
     void SetRotation(float pitch, float yaw);
-    void SetCenter(float x, float y);
     void SetSize(int width, int height);
     void Scroll(float delta);
     void Drag(float dx, float dy);

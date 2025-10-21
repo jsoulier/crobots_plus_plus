@@ -10,6 +10,7 @@ class RobotContext
 public:
     Meters X;
     Meters Y;
+    MetersPerSecond Speed;
     Radians Rotation;
 };
 

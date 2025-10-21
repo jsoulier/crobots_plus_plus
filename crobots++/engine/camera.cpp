@@ -13,7 +13,7 @@ static constexpr glm::vec3 kUp{0.0f, 1.0f, 0.0f};
 
 Camera::Camera()
     : Type{CameraType::TopDown}
-    , Position{}
+    , Position{0.0f, 0.0f, 100.0f}
     , Forward{}
     , Right{}
     , Up{0.0f, 1.0f, 0.0f}
@@ -22,14 +22,14 @@ Camera::Camera()
     , Height{1}
     , Pitch{0.0f}
     , Yaw{0.0f}
-    , MoveSpeed{1.0f}
+    , MoveSpeed{0.1f}
     , RotateSpeed{1.0f}
-    , ZoomSpeed{1.0f}
+    , ZoomSpeed{10.0f}
     , Fov{glm::radians(60.0f)}
     , Near{0.1f}
     , Far{100.0f}
 {
-    SetRotation(0.0f, 0.0f);
+    SetRotation(0.0f, -glm::radians(90.0f));
 }
 
 void Camera::Update()
@@ -38,8 +38,8 @@ void Camera::Update()
     switch (Type)
     {
     case CameraType::TopDown:
-        float width = Width / 100.0f;
-        float height = Height / 100.0f;
+        float width = Width / Position.z;
+        float height = Height / Position.z;
         proj = glm::ortho(-width, width, height, -height, 0.0f, Far);
         // proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
         break;
@@ -72,10 +72,6 @@ void Camera::SetRotation(float pitch, float yaw)
     Up = glm::normalize(Up);
 }
 
-void Camera::SetCenter(float x, float y)
-{
-}
-
 void Camera::SetSize(int width, int height)
 {
     Width = std::max(width, 1);
@@ -87,7 +83,8 @@ void Camera::Scroll(float delta)
     switch (Type)
     {
     case CameraType::TopDown:
-        Position += Forward * delta * ZoomSpeed;
+        Position -= Forward * delta * ZoomSpeed;
+        Position.z = std::max(Position.z, 1.0f);
         break;
     }
 }
@@ -97,8 +94,8 @@ void Camera::Drag(float dx, float dy)
     switch (Type)
     {
     case CameraType::TopDown:
-        Position += Right * dx * MoveSpeed;
-        Position += Up * dy * MoveSpeed;
+        Position += Right * dx / Position.z * 2.0f;
+        Position -= Up * dy / Position.z * 2.0f;
         break;
     }
 }
