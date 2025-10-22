@@ -19,6 +19,15 @@
 #include "robot.hpp"
 #include "shader.hpp"
 
+struct SolidPolygonVertex
+{
+    glm::vec3 Position;
+    uint32_t Color;
+    glm::vec2 Offset;
+    float Sin;
+    float Cos;
+};
+
 struct Instance
 {
     glm::mat4 Matrix;
@@ -40,12 +49,15 @@ static SDL_Window* window;
 static SDL_GPUDevice* device;
 static SDL_GPUTexture* depthTexture;
 static SDL_GPUGraphicsPipeline* cubePipeline;
+static SDL_GPUGraphicsPipeline* solidPolygonPipeline;
 static SDL_GPUBuffer* cubeBuffer;
 static DynamicBuffer<Instance> instanceBuffer;
+static DynamicBuffer<SolidPolygonVertex> solidPolygonBuffer;
 static Camera camera;
 static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
 static b2WorldId worldId;
+static b2DebugDraw debugDraw;
 
 static bool Parse(int argc, char** argv)
 {
@@ -77,6 +89,38 @@ static bool Parse(int argc, char** argv)
         return false;
     }
     return true;
+}
+
+static b2BodyId CreateBody()
+{
+    b2BodyDef bodyDef = b2DefaultBodyDef();
+    bodyDef.type = b2_dynamicBody;
+    bodyDef.position = {0.0f, 0.0f};
+    b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
+    b2ShapeDef shapeDef = b2DefaultShapeDef();
+    shapeDef.density = 1.0f;
+    b2Polygon box = b2MakeBox(0.5f, 0.5f);
+    b2CreatePolygonShape(bodyId, &shapeDef, &box);
+    return bodyId;
+}
+
+static void DrawSolidPolygon(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
+{
+    static constexpr int kIndices[] = {0, 1, 2, 3, 0, 2};
+    for (int i = 0; i < vertexCount / 4; i++)
+    for (int j = 0; j < 6; j++)
+    {
+        SolidPolygonVertex vertex;
+        vertex.Position.x = vertices[i * 4 + kIndices[j]].x;
+        vertex.Position.y = vertices[i * 4 + kIndices[j]].y;
+        vertex.Position.z = 1.0f; // TODO:
+        vertex.Color = color;
+        vertex.Offset.x = transform.p.x;
+        vertex.Offset.y = transform.p.y;
+        vertex.Sin = transform.q.s;
+        vertex.Cos = transform.q.c;
+        solidPolygonBuffer.Emplace(device, vertex);
+    }
 }
 
 static bool Init()
@@ -119,12 +163,30 @@ static bool Init()
         SDL_Log("Failed to create cube pipeline");
         return false;
     }
+    solidPolygonPipeline = CreateSolidPolygonPipeline(device, window);
+    if (!solidPolygonPipeline)
+    {
+        SDL_Log("Failed to create solid polygon pipeline");
+        return false;
+    }
     {
         b2WorldDef worldDef = b2DefaultWorldDef();
         worldId = b2CreateWorld(&worldDef);
         if (B2_IS_NULL(worldId))
         {
             SDL_Log("Failed to create box2d world");
+            return false;
+        }
+        debugDraw = b2DefaultDebugDraw();
+        debugDraw.DrawSolidPolygonFcn = DrawSolidPolygon;
+        debugDraw.drawShapes = true;
+    }
+    for (Robot& robot : robots)
+    {
+        robot.BodyId = CreateBody();
+        if (B2_IS_NULL(robot.BodyId))
+        {
+            SDL_Log("Failed to create box2d body");
             return false;
         }
     }
@@ -175,12 +237,14 @@ static void Draw()
         }
         camera.SetSize(width, height);
     }
+    b2World_Draw(worldId, &debugDraw);
     for (Robot& robot : robots)
     {
         // TODO: b2Body
         instanceBuffer.Emplace(device, glm::mat4(1.0f));
     }
     instanceBuffer.Upload(device, commandBuffer);
+    solidPolygonBuffer.Upload(device, commandBuffer);
     camera.Update();
     if (instanceBuffer.GetSize())
     {
@@ -208,6 +272,33 @@ static void Draw()
         SDL_BindGPUVertexBuffers(renderPass, 0, vertexBuffers, 2);
         SDL_PushGPUVertexUniformData(commandBuffer, 0, &camera.GetViewProj(), 64);
         SDL_DrawGPUPrimitives(renderPass, 36, instanceBuffer.GetSize(), 0, 0);
+        SDL_EndGPURenderPass(renderPass);
+    }
+    if (solidPolygonBuffer.GetSize())
+    {
+        SDL_GPUColorTargetInfo colorInfo{};
+        SDL_GPUDepthStencilTargetInfo depthInfo{};
+        colorInfo.texture = swapchainTexture;
+        colorInfo.load_op = SDL_GPU_LOADOP_LOAD;
+        colorInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.texture = depthTexture;
+        depthInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.clear_depth = 1.0f;
+        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, &depthInfo);
+        if (!renderPass)
+        {
+            SDL_Log("Failed to begin render pass: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(commandBuffer);
+            return;
+        }
+        SDL_GPUBufferBinding vertexBuffer{};
+        vertexBuffer.buffer = solidPolygonBuffer.GetBuffer();
+        SDL_BindGPUGraphicsPipeline(renderPass, solidPolygonPipeline);
+        SDL_BindGPUVertexBuffers(renderPass, 0, &vertexBuffer, 1);
+        SDL_PushGPUVertexUniformData(commandBuffer, 0, &camera.GetViewProj(), 64);
+        SDL_DrawGPUPrimitives(renderPass, solidPolygonBuffer.GetSize(), 1, 0, 0);
         SDL_EndGPURenderPass(renderPass);
     }
     SDL_SubmitGPUCommandBuffer(commandBuffer);
@@ -248,9 +339,11 @@ int main(int argc, char** argv)
         Draw();
     }
     b2DestroyWorld(worldId);
+    solidPolygonBuffer.Destroy(device);
     instanceBuffer.Destroy(device);
     SDL_ReleaseGPUTexture(device, depthTexture);
     SDL_ReleaseGPUBuffer(device, cubeBuffer);
+    SDL_ReleaseGPUGraphicsPipeline(device, solidPolygonPipeline);
     SDL_ReleaseGPUGraphicsPipeline(device, cubePipeline);
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);
