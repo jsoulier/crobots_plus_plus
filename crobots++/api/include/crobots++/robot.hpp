@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 
 #if defined(_WIN32)
@@ -11,7 +12,7 @@
 #endif
 
 #define CROBOTS_ROBOT(T) \
-    CROBOTS_ENTRYPOINT crobots::IRobot* NewRobot(crobots::RobotContext* context) \
+    CROBOTS_ENTRYPOINT crobots::IRobot* NewRobot(const std::shared_ptr<crobots::RobotContext>& context) \
     { \
         return crobots::IRobot::Create<T>(context); \
     } \
@@ -27,7 +28,7 @@ protected:
 
 public:
     template<typename T>
-    static IRobot* Create(RobotContext* context)
+    static IRobot* Create(const std::shared_ptr<RobotContext>& context)
     {
         IRobot* robot = new T();
         robot->Context = context;
@@ -71,7 +72,7 @@ public:
     float GetTime();
 
 private:
-    RobotContext* Context;
+    std::shared_ptr<RobotContext> Context;
 };
 
 }

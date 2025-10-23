@@ -31,7 +31,7 @@ add_executable(engine WIN32
     crobots++/engine/main.cpp
     crobots++/engine/mesh.cpp
     crobots++/engine/pipeline.cpp
-    crobots++/engine/robot.cpp
+    crobots++/engine/registry.cpp
     crobots++/engine/shader.cpp
 )
 set_target_properties(engine PROPERTIES CXX_STANDARD 23)

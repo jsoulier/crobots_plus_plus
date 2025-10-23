@@ -1,15 +1,29 @@
 #include <SDL3/SDL.h>
 
 #include <filesystem>
+#include <memory>
 #include <string_view>
 
-#include "robot.hpp"
+#include "registry.hpp"
 
 static constexpr const char* kNewRobot = "NewRobot";
-using NewRobotFunction = crobots::IRobot*(*)(crobots::RobotContext* context);
 
-crobots::IRobot* LoadRobot(const std::string_view& name, crobots::RobotContext* context)
+crobots::IRobot* Registry::Load(const std::string_view& name, const std::shared_ptr<crobots::RobotContext>& context)
 {
+    for (Entry& entry : Entries)
+    {
+        if (entry.Name != name)
+        {
+            continue;
+        }
+        crobots::IRobot* robot = entry.Function(context);
+        if (!robot)
+        {
+            SDL_Log("Failed to create robot: %s, %s", name.data(), SDL_GetError());
+            return nullptr;
+        }
+        return robot;
+    }
     std::filesystem::path path = SDL_GetBasePath();
     path /= name;
 #if defined(SDL_PLATFORM_WIN32)
@@ -39,6 +53,14 @@ crobots::IRobot* LoadRobot(const std::string_view& name, crobots::RobotContext* 
         SDL_UnloadObject(object);
         return nullptr;
     }
-    SDL_UnloadObject(object);
+    Entries.emplace_back(name, object, function);
     return robot;
+}
+
+void Registry::Destroy()
+{
+    for (Entry& entry : Entries)
+    {
+        SDL_UnloadObject(entry.Object);
+    }
 }

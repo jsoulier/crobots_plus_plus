@@ -18,7 +18,7 @@
 #include "camera.hpp"
 #include "mesh.hpp"
 #include "pipeline.hpp"
-#include "robot.hpp"
+#include "registry.hpp"
 #include "shader.hpp"
 
 struct SolidPolygonVertex
@@ -38,7 +38,7 @@ struct Instance
 struct Robot
 {
     std::unique_ptr<crobots::IRobot> Interface;
-    crobots::RobotContext Context;
+    std::shared_ptr<crobots::RobotContext> Context;
     b2BodyId BodyId;
 };
 
@@ -56,6 +56,7 @@ static SDL_GPUBuffer* cubeBuffer;
 static DynamicBuffer<Instance> instanceBuffer;
 static DynamicBuffer<SolidPolygonVertex> solidPolygonBuffer;
 static Camera camera;
+static Registry registry;
 static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
 static b2WorldId worldId;
@@ -77,7 +78,8 @@ static bool Parse(int argc, char** argv)
                     break;
                 }
                 Robot robot;
-                robot.Interface.reset(LoadRobot(inner, &robot.Context));
+                robot.Context = std::make_shared<crobots::RobotContext>();
+                robot.Interface.reset(registry.Load(inner, robot.Context));
                 if (!robot.Interface)
                 {
                     continue;
@@ -105,41 +107,6 @@ static bool Parse(int argc, char** argv)
         return false;
     }
     return true;
-}
-
-static b2BodyId CreateBody()
-{
-    b2BodyDef bodyDef = b2DefaultBodyDef();
-    bodyDef.type = b2_dynamicBody;
-    bodyDef.position = {0.0f, 0.0f};
-    b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
-    b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.0f;
-    shapeDef.material.friction = 0.0f;
-    b2Polygon box = b2MakeBox(0.5f, 0.5f);
-    b2CreatePolygonShape(bodyId, &shapeDef, &box);
-    return bodyId;
-}
-
-static void DrawSolidPolygon(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
-{
-    for (int i = 1; i < vertexCount - 1; i++)
-    {
-        const int kIndices[3] = {0, i, i + 1};
-        for (int j = 0; j < 3; j++)
-        {
-            SolidPolygonVertex vertex;
-            vertex.Position.x = vertices[kIndices[j]].x;
-            vertex.Position.y = 1.0f;
-            vertex.Position.z = vertices[kIndices[j]].y;
-            vertex.Color = color;
-            vertex.WorldPosition.x = transform.p.x;
-            vertex.WorldPosition.y = transform.p.y;
-            vertex.Sin = transform.q.s;
-            vertex.Cos = transform.q.c;
-            solidPolygonBuffer.Emplace(device, vertex);
-        }
-    }
 }
 
 static bool Init()
@@ -199,23 +166,51 @@ static bool Init()
             return false;
         }
         debugDraw = b2DefaultDebugDraw();
-        debugDraw.DrawSolidPolygonFcn = DrawSolidPolygon;
+        debugDraw.DrawSolidPolygonFcn = [](b2Transform transform, const b2Vec2* vertices,
+            int count, float radius, b2HexColor color, void* context)
+        {
+            for (int i = 1; i < count - 1; i++)
+            {
+                const int kIndices[3] = {0, i, i + 1};
+                for (int j = 0; j < 3; j++)
+                {
+                    SolidPolygonVertex vertex;
+                    vertex.Position.x = vertices[kIndices[j]].x;
+                    vertex.Position.y = 1.0f;
+                    vertex.Position.z = vertices[kIndices[j]].y;
+                    vertex.Color = color;
+                    vertex.WorldPosition.x = transform.p.x;
+                    vertex.WorldPosition.y = transform.p.y;
+                    vertex.Sin = transform.q.s;
+                    vertex.Cos = transform.q.c;
+                    solidPolygonBuffer.Emplace(device, vertex);
+                }
+            }
+        };
         debugDraw.drawShapes = true;
     }
     for (Robot& robot : robots)
     {
-        robot.BodyId = CreateBody();
+        b2BodyDef bodyDef = b2DefaultBodyDef();
+        bodyDef.type = b2_dynamicBody;
+        bodyDef.position = {0.0f, 0.0f};
+        robot.BodyId = b2CreateBody(worldId, &bodyDef);
         if (B2_IS_NULL(robot.BodyId))
         {
             SDL_Log("Failed to create box2d body");
             return false;
         }
-        b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
-        b2Vec2 velocity;
-        velocity.x = 1.0f;
-        velocity.y = 2.0f;
-        b2Body_SetLinearVelocity(robot.BodyId, velocity);
-        b2Body_SetLinearDamping(robot.BodyId, 0.0f);
+        b2ShapeDef shapeDef = b2DefaultShapeDef();
+        shapeDef.density = 1.0f;
+        shapeDef.material.friction = 0.0f;
+        b2Polygon box = b2MakeBox(0.5f, 0.5f);
+        b2CreatePolygonShape(robot.BodyId, &shapeDef, &box);
+        // b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
+        // b2Vec2 velocity;
+        // velocity.x = 1.0f;
+        // velocity.y = 2.0f;
+        // b2Body_SetLinearVelocity(robot.BodyId, velocity);
+        // b2Body_SetLinearDamping(robot.BodyId, 0.0f);
     }
     return true;
 }
@@ -224,10 +219,14 @@ static void Tick()
 {
     for (Robot& robot : robots)
     {
+        robot.Interface->Update();
+    }
+    for (Robot& robot : robots)
+    {
         glm::vec2 velocity;
-        velocity.x = std::cos(robot.Context.Rotation);
-        velocity.y = std::sin(robot.Context.Rotation);
-        velocity *= robot.Context.Speed;
+        velocity.x = std::cos(robot.Context->Rotation);
+        velocity.y = std::sin(robot.Context->Rotation);
+        velocity *= robot.Context->Speed;
         b2Vec2 linearVelocity = b2Body_GetLinearVelocity(robot.BodyId);
         velocity.x -= linearVelocity.x;
         velocity.y -= linearVelocity.y;
@@ -235,7 +234,7 @@ static void Tick()
         glm::vec2 force = velocity * kP;
         float mass = b2Body_GetMass(robot.BodyId);
         // TODO: timestep probably needs to be applied here
-        float maxForce = mass * robot.Context.Acceleration;
+        float maxForce = mass * robot.Context->Acceleration;
         float forceMagnitude = glm::length(force);
         if (forceMagnitude > maxForce)
         {
@@ -250,8 +249,8 @@ static void Tick()
     for (Robot& robot : robots)
     {
         b2Vec2 position = b2Body_GetPosition(robot.BodyId);
-        robot.Context.X = position.x;
-        robot.Context.Y = position.y;
+        robot.Context->X = position.x;
+        robot.Context->Y = position.y;
     }
 }
 
@@ -418,5 +417,6 @@ int main(int argc, char** argv)
     SDL_Quit();
     robots.clear();
     projectiles.clear();
+    registry.Destroy();
     return 0;
 }
