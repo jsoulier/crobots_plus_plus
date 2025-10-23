@@ -10,41 +10,45 @@
 #include "camera.hpp"
 
 static constexpr glm::vec3 kUp{0.0f, 1.0f, 0.0f};
+static constexpr float kMaxPitch = glm::pi<float>() / 2.0f - 0.01f;
 
 Camera::Camera()
-    : Type{CameraType::TopDown}
-    , Position{0.0f, 0.0f, 100.0f}
+    : Type{CameraType::ArcBall}
+    , Position{0.0f, 0.0f, 0.0f}
     , Forward{}
     , Right{}
-    , Up{0.0f, 1.0f, 0.0f}
+    , Up{}
     , ViewProj{}
     , Width{1}
     , Height{1}
     , Pitch{0.0f}
     , Yaw{0.0f}
     , MoveSpeed{0.1f}
-    , RotateSpeed{1.0f}
-    , ZoomSpeed{10.0f}
+    , RotateSpeed{0.01f}
+    , ZoomSpeed{2.0f}
     , Fov{glm::radians(60.0f)}
     , Near{0.1f}
     , Far{100.0f}
 {
-    SetRotation(0.0f, -glm::radians(90.0f));
+    SetRotation(0.0f, 0.0f);
 }
 
 void Camera::Update()
 {
     glm::mat4 proj;
+    glm::mat4 view;
     switch (Type)
     {
-    case CameraType::TopDown:
-        float width = Width / Position.z;
-        float height = Height / Position.z;
-        proj = glm::ortho(-width, width, height, -height, 0.0f, Far);
-        // proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
+    case CameraType::ArcBall:
+        proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
         break;
     }
-    glm::mat4 view = glm::lookAt(Position, Position + Forward, kUp);
+    switch (Type)
+    {
+    case CameraType::ArcBall:
+        view = glm::lookAt(Position, Position + Forward, kUp);
+        break;
+    }
     ViewProj = proj * view;
 }
 
@@ -53,23 +57,29 @@ void Camera::SetType(CameraType type)
     Type = type;
     switch (Type)
     {
-    case CameraType::TopDown:
+    case CameraType::ArcBall:
         break;
     }
 }
 
 void Camera::SetRotation(float pitch, float yaw)
 {
-    Pitch = pitch;
+    Pitch = std::clamp(pitch, -kMaxPitch, kMaxPitch);
     Yaw = yaw;
     Forward.x = std::cos(Pitch) * std::cos(Yaw);
     Forward.y = std::sin(Pitch);
     Forward.z = std::cos(Pitch) * std::sin(Yaw);
     Forward = glm::normalize(Forward);
-    Right = glm::cross(Up, Forward);
+    Right = glm::cross(kUp, Forward);
     Right = glm::normalize(Right);
     Up = glm::cross(Forward, Right);
     Up = glm::normalize(Up);
+    switch (Type)
+    {
+    case CameraType::ArcBall:
+        Position = -Forward * std::max(glm::length(Position), 1.0f);
+        break;
+    }
 }
 
 void Camera::SetSize(int width, int height)
@@ -82,9 +92,8 @@ void Camera::Scroll(float delta)
 {
     switch (Type)
     {
-    case CameraType::TopDown:
-        Position -= Forward * delta * ZoomSpeed;
-        Position.z = std::max(Position.z, 1.0f);
+    case CameraType::ArcBall:
+        Position += Forward * delta * ZoomSpeed;
         break;
     }
 }
@@ -93,9 +102,8 @@ void Camera::Drag(float dx, float dy)
 {
     switch (Type)
     {
-    case CameraType::TopDown:
-        Position += Right * dx / Position.z * 2.0f;
-        Position -= Up * dy / Position.z * 2.0f;
+    case CameraType::ArcBall:
+        SetRotation(Pitch - dy * RotateSpeed, Yaw + dx * RotateSpeed);
         break;
     }
 }
@@ -104,7 +112,7 @@ void Camera::Rotate(float dx, float dy)
 {
     switch (Type)
     {
-    case CameraType::TopDown:
+    case CameraType::ArcBall:
         break;
     }
 }
@@ -113,14 +121,14 @@ void Camera::Move(float dx, float dy, float dz, float dt)
 {
     switch (Type)
     {
-    case CameraType::TopDown:
+    case CameraType::ArcBall:
         break;
     }
 }
 
 CameraType Camera::GetType() const
 {
-    return CameraType::TopDown;
+    return Type;
 }
 
 const glm::vec3& Camera::GetPosition() const

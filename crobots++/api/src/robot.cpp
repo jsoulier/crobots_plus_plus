@@ -8,40 +8,41 @@ IRobot::IRobot()
 {
 }
 
-void IRobot::SetSpeed(MetersPerSecond speed)
+void IRobot::SetSpeed(float speed)
 {
+    Context->Speed = speed;
 }
 
-MetersPerSecond IRobot::GetSpeed()
+float IRobot::GetSpeed()
 {
     return {};
 }
 
-Radians IRobot::GetRotation()
+float IRobot::GetRotation()
 {
     return Context->Rotation;
 }
 
-Meters IRobot::GetX()
+float IRobot::GetX()
 {
     return Context->X;
 }
 
-Meters IRobot::GetY()
+float IRobot::GetY()
 {
     return Context->Y;
 }
 
-void IRobot::Fire(Radians radians, Meters range)
+void IRobot::Fire(float angle, float range)
 {
 }
 
-std::optional<Meters> IRobot::Scan(Radians angle, Radians width)
+std::optional<float> IRobot::Scan(float angle, float width)
 {
     return {};
 }
 
-Celsius IRobot::GetHeat()
+float IRobot::GetHeat()
 {
     return {};
 }
@@ -55,7 +56,7 @@ float IRobot::GetDamage()
     return 0.0f;
 }
 
-Seconds IRobot::GetTime()
+float IRobot::GetTime()
 {
     return {};
 }

@@ -9,6 +9,8 @@
             "args": [
                 "--robots",
                 "up_down",
+                "--timestep",
+                "0.016",
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "CMake: build"

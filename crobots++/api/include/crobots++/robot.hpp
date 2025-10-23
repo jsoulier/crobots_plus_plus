@@ -1,7 +1,5 @@
 #pragma once
 
-#include <crobots++/math.hpp>
-
 #include <optional>
 
 #if defined(_WIN32)
@@ -42,17 +40,35 @@ public:
     IRobot& operator=(IRobot&& other) = delete;
     ~IRobot() = default;
     virtual void Update() = 0;
-    void SetSpeed(MetersPerSecond speed);
-    MetersPerSecond GetSpeed();
-    Radians GetRotation();
-    Meters GetX();
-    Meters GetY();
-    void Fire(Radians radians, Meters range);
-    std::optional<Meters> Scan(Radians angle, Radians width);
-    Celsius GetHeat();
+    
+    /**
+     * @param speed
+     */
+    void SetSpeed(float speed);
+
+    // meters/second
+    float GetSpeed();
+
+    // radians
+    float GetRotation();
+
+    // meters
+    float GetX();
+
+    // meters
+    float GetY();
+
+    void Fire(float angle, float range);
+
+    std::optional<float> Scan(float angle, float width);
+
+    float GetHeat();
+
     void CoolDown();
+
     float GetDamage();
-    Seconds GetTime();
+
+    float GetTime();
 
 private:
     RobotContext* Context;

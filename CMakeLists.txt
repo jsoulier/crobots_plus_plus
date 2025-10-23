@@ -11,14 +11,12 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${BINARY_DIR})
 make_directory(${BINARY_DIR})
 
 set(GLM_BUILD_LIBRARY OFF)
+set(SDL_TEST_LIBRARY OFF)
 add_subdirectory(crobots++/external/SDL)
 add_subdirectory(crobots++/external/box2d)
 add_subdirectory(crobots++/external/glm)
 add_subdirectory(crobots++/external/jsmn)
-add_library(api
-    crobots++/api/src/math.cpp
-    crobots++/api/src/robot.cpp
-)
+add_library(api crobots++/api/src/robot.cpp)
 set_target_properties(api PROPERTIES CXX_STANDARD 23)
 target_include_directories(api PUBLIC crobots++/api/include)
 file(GLOB ROBOTS robots/*.cpp)

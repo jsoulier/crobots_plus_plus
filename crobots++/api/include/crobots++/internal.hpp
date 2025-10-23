@@ -1,17 +1,25 @@
 #pragma once
 
-#include <crobots++/math.hpp>
-
 namespace crobots
 {
 
 class RobotContext
 {
 public:
-    Meters X;
-    Meters Y;
-    MetersPerSecond Speed;
-    Radians Rotation;
+    RobotContext()
+        : X{0.0f}
+        , Y{0.0f}
+        , Speed{0.0f}
+        , Rotation{0.0f}
+        , Acceleration{1.0f}
+    {
+    }
+
+    float X;
+    float Y;
+    float Speed;
+    float Rotation;
+    float Acceleration;
 };
 
 }

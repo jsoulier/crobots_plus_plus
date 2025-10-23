@@ -4,7 +4,7 @@
 
 enum class CameraType
 {
-    TopDown,
+    ArcBall,
 };
 
 class Camera

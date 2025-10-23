@@ -6,7 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <cmath>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <string>
 #include <utility>
@@ -23,7 +25,7 @@ struct SolidPolygonVertex
 {
     glm::vec3 Position;
     uint32_t Color;
-    glm::vec2 Offset;
+    glm::vec2 WorldPosition;
     float Sin;
     float Cos;
 };
@@ -58,6 +60,7 @@ static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
 static b2WorldId worldId;
 static b2DebugDraw debugDraw;
+static float timestep = 0.016f;
 
 static bool Parse(int argc, char** argv)
 {
@@ -82,6 +85,19 @@ static bool Parse(int argc, char** argv)
                 robots.push_back(std::move(robot));
             }
         }
+        else if (outer == "--timestep")
+        {
+            std::string inner = argv[i];
+            try
+            {
+                timestep = std::stof(inner);
+            }
+            catch (const std::invalid_argument& e)
+            {
+                SDL_Log("Failed to parse timestep: %s", e.what());
+                return false;
+            }
+        }
     }
     if (robots.empty())
     {
@@ -99,6 +115,7 @@ static b2BodyId CreateBody()
     b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
     b2ShapeDef shapeDef = b2DefaultShapeDef();
     shapeDef.density = 1.0f;
+    shapeDef.material.friction = 0.0f;
     b2Polygon box = b2MakeBox(0.5f, 0.5f);
     b2CreatePolygonShape(bodyId, &shapeDef, &box);
     return bodyId;
@@ -106,20 +123,22 @@ static b2BodyId CreateBody()
 
 static void DrawSolidPolygon(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
 {
-    static constexpr int kIndices[] = {0, 1, 2, 3, 0, 2};
-    for (int i = 0; i < vertexCount / 4; i++)
-    for (int j = 0; j < 6; j++)
+    for (int i = 1; i < vertexCount - 1; i++)
     {
-        SolidPolygonVertex vertex;
-        vertex.Position.x = vertices[i * 4 + kIndices[j]].x;
-        vertex.Position.y = vertices[i * 4 + kIndices[j]].y;
-        vertex.Position.z = 1.0f; // TODO:
-        vertex.Color = color;
-        vertex.Offset.x = transform.p.x;
-        vertex.Offset.y = transform.p.y;
-        vertex.Sin = transform.q.s;
-        vertex.Cos = transform.q.c;
-        solidPolygonBuffer.Emplace(device, vertex);
+        const int kIndices[3] = {0, i, i + 1};
+        for (int j = 0; j < 3; j++)
+        {
+            SolidPolygonVertex vertex;
+            vertex.Position.x = vertices[kIndices[j]].x;
+            vertex.Position.y = 1.0f;
+            vertex.Position.z = vertices[kIndices[j]].y;
+            vertex.Color = color;
+            vertex.WorldPosition.x = transform.p.x;
+            vertex.WorldPosition.y = transform.p.y;
+            vertex.Sin = transform.q.s;
+            vertex.Cos = transform.q.c;
+            solidPolygonBuffer.Emplace(device, vertex);
+        }
     }
 }
 
@@ -171,6 +190,8 @@ static bool Init()
     }
     {
         b2WorldDef worldDef = b2DefaultWorldDef();
+        worldDef.gravity.x = 0.0f;
+        worldDef.gravity.y = 0.0f;
         worldId = b2CreateWorld(&worldDef);
         if (B2_IS_NULL(worldId))
         {
@@ -189,8 +210,49 @@ static bool Init()
             SDL_Log("Failed to create box2d body");
             return false;
         }
+        b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
+        b2Vec2 velocity;
+        velocity.x = 1.0f;
+        velocity.y = 2.0f;
+        b2Body_SetLinearVelocity(robot.BodyId, velocity);
+        b2Body_SetLinearDamping(robot.BodyId, 0.0f);
     }
     return true;
+}
+
+static void Tick()
+{
+    for (Robot& robot : robots)
+    {
+        glm::vec2 velocity;
+        velocity.x = std::cos(robot.Context.Rotation);
+        velocity.y = std::sin(robot.Context.Rotation);
+        velocity *= robot.Context.Speed;
+        b2Vec2 linearVelocity = b2Body_GetLinearVelocity(robot.BodyId);
+        velocity.x -= linearVelocity.x;
+        velocity.y -= linearVelocity.y;
+        static constexpr float kP = 5.0f;
+        glm::vec2 force = velocity * kP;
+        float mass = b2Body_GetMass(robot.BodyId);
+        // TODO: timestep probably needs to be applied here
+        float maxForce = mass * robot.Context.Acceleration;
+        float forceMagnitude = glm::length(force);
+        if (forceMagnitude > maxForce)
+        {
+            force *= maxForce / forceMagnitude;
+        }
+        b2Vec2 linearForce;
+        linearForce.x = force.x;
+        linearForce.y = force.y;
+        b2Body_ApplyForceToCenter(robot.BodyId, linearForce, true);
+    }
+    b2World_Step(worldId, timestep, 4);
+    for (Robot& robot : robots)
+    {
+        b2Vec2 position = b2Body_GetPosition(robot.BodyId);
+        robot.Context.X = position.x;
+        robot.Context.Y = position.y;
+    }
 }
 
 static void Draw()
@@ -240,8 +302,13 @@ static void Draw()
     b2World_Draw(worldId, &debugDraw);
     for (Robot& robot : robots)
     {
-        // TODO: b2Body
-        instanceBuffer.Emplace(device, glm::mat4(1.0f));
+        b2Vec2 position = b2Body_GetPosition(robot.BodyId);
+        b2Rot rotation = b2Body_GetRotation(robot.BodyId);
+        glm::mat4 rot = glm::mat4(1.0f);
+        rot = glm::rotate(rot, std::atan2(rotation.c, rotation.s), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 trans = glm::translate(glm::mat4(1.0f), glm::vec3(position.x, 0.0f, position.y));
+        glm::mat4 transform = trans * rot;
+        instanceBuffer.Emplace(device, transform);
     }
     instanceBuffer.Upload(device, commandBuffer);
     solidPolygonBuffer.Upload(device, commandBuffer);
@@ -336,6 +403,7 @@ int main(int argc, char** argv)
                 break;
             }
         }
+        Tick();
         Draw();
     }
     b2DestroyWorld(worldId);
