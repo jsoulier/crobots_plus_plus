@@ -19,7 +19,15 @@
 #include "mesh.hpp"
 #include "pipeline.hpp"
 #include "registry.hpp"
-#include "shader.hpp"
+
+static constexpr float kPhysicsY = 0.0f;
+static constexpr float kWorldWidth = 20.0f;
+
+struct LineVertex
+{
+    glm::vec3 Position;
+    uint32_t Color;
+};
 
 struct SolidPolygonVertex
 {
@@ -51,9 +59,11 @@ static SDL_Window* window;
 static SDL_GPUDevice* device;
 static SDL_GPUTexture* depthTexture;
 static SDL_GPUGraphicsPipeline* cubePipeline;
+static SDL_GPUGraphicsPipeline* linePipeline;
 static SDL_GPUGraphicsPipeline* solidPolygonPipeline;
 static SDL_GPUBuffer* cubeBuffer;
 static DynamicBuffer<Instance> instanceBuffer;
+static DynamicBuffer<LineVertex> lineBuffer;
 static DynamicBuffer<SolidPolygonVertex> solidPolygonBuffer;
 static Camera camera;
 static Registry registry;
@@ -149,6 +159,12 @@ static bool Init()
         SDL_Log("Failed to create cube pipeline");
         return false;
     }
+    linePipeline = CreateLinePipeline(device, window);
+    if (!linePipeline)
+    {
+        SDL_Log("Failed to create line pipeline");
+        return false;
+    }
     solidPolygonPipeline = CreateSolidPolygonPipeline(device, window);
     if (!solidPolygonPipeline)
     {
@@ -176,7 +192,7 @@ static bool Init()
                 {
                     SolidPolygonVertex vertex;
                     vertex.Position.x = vertices[kIndices[j]].x;
-                    vertex.Position.y = 1.0f;
+                    vertex.Position.y = kPhysicsY;
                     vertex.Position.z = vertices[kIndices[j]].y;
                     vertex.Color = color;
                     vertex.WorldPosition.x = transform.p.x;
@@ -187,13 +203,28 @@ static bool Init()
                 }
             }
         };
+        debugDraw.DrawSegmentFcn = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
+        {
+            LineVertex vertex0;
+            vertex0.Position.x = p1.x;
+            vertex0.Position.y = kPhysicsY;
+            vertex0.Position.z = p1.y;
+            vertex0.Color = color;
+            LineVertex vertex1;
+            vertex1.Position.x = p2.x;
+            vertex1.Position.y = kPhysicsY;
+            vertex1.Position.z = p2.y;
+            vertex1.Color = color;
+            lineBuffer.Emplace(device, vertex0);
+            lineBuffer.Emplace(device, vertex1);
+        };
         debugDraw.drawShapes = true;
     }
     for (Robot& robot : robots)
     {
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
-        bodyDef.position = {0.0f, 0.0f};
+        bodyDef.position = {kWorldWidth / 2, kWorldWidth / 2};
         robot.BodyId = b2CreateBody(worldId, &bodyDef);
         if (B2_IS_NULL(robot.BodyId))
         {
@@ -205,13 +236,26 @@ static bool Init()
         shapeDef.material.friction = 0.0f;
         b2Polygon box = b2MakeBox(0.5f, 0.5f);
         b2CreatePolygonShape(robot.BodyId, &shapeDef, &box);
-        // b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
-        // b2Vec2 velocity;
-        // velocity.x = 1.0f;
-        // velocity.y = 2.0f;
-        // b2Body_SetLinearVelocity(robot.BodyId, velocity);
-        // b2Body_SetLinearDamping(robot.BodyId, 0.0f);
     }
+    {
+        b2BodyDef bodyDef = b2DefaultBodyDef();
+        bodyDef.type = b2_staticBody;
+        bodyDef.position = {0.0f, 0.0f};
+        b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
+        b2Vec2 points[4] =
+        {
+            {0.0f, 0.0f},
+            {0.0f, kWorldWidth},
+            {kWorldWidth, kWorldWidth},
+            {kWorldWidth, 0.0f}
+        };
+        b2ChainDef chainDef = b2DefaultChainDef();
+        chainDef.points = points;
+        chainDef.count = 4;
+        chainDef.isLoop = true;
+        b2CreateChain(bodyId, &chainDef);
+    }
+    camera.SetCenter(kWorldWidth / 2, kWorldWidth / 2);
     return true;
 }
 
@@ -298,7 +342,10 @@ static void Draw()
         }
         camera.SetSize(width, height);
     }
-    b2World_Draw(worldId, &debugDraw);
+    if (true)
+    {
+        b2World_Draw(worldId, &debugDraw);
+    }
     for (Robot& robot : robots)
     {
         b2Vec2 position = b2Body_GetPosition(robot.BodyId);
@@ -309,8 +356,17 @@ static void Draw()
         glm::mat4 transform = trans * rot;
         instanceBuffer.Emplace(device, transform);
     }
-    instanceBuffer.Upload(device, commandBuffer);
-    solidPolygonBuffer.Upload(device, commandBuffer);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commandBuffer);
+    if (!copyPass)
+    {
+        SDL_Log("Failed to begin copy pass: %s", SDL_GetError());
+        SDL_SubmitGPUCommandBuffer(commandBuffer);
+        return;
+    }
+    instanceBuffer.Upload(device, copyPass);
+    lineBuffer.Upload(device, copyPass);
+    solidPolygonBuffer.Upload(device, copyPass);
+    SDL_EndGPUCopyPass(copyPass);
     camera.Update();
     if (instanceBuffer.GetSize())
     {
@@ -367,6 +423,33 @@ static void Draw()
         SDL_DrawGPUPrimitives(renderPass, solidPolygonBuffer.GetSize(), 1, 0, 0);
         SDL_EndGPURenderPass(renderPass);
     }
+    if (lineBuffer.GetSize())
+    {
+        SDL_GPUColorTargetInfo colorInfo{};
+        SDL_GPUDepthStencilTargetInfo depthInfo{};
+        colorInfo.texture = swapchainTexture;
+        colorInfo.load_op = SDL_GPU_LOADOP_LOAD;
+        colorInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.texture = depthTexture;
+        depthInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.clear_depth = 1.0f;
+        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, &depthInfo);
+        if (!renderPass)
+        {
+            SDL_Log("Failed to begin render pass: %s", SDL_GetError());
+            SDL_SubmitGPUCommandBuffer(commandBuffer);
+            return;
+        }
+        SDL_GPUBufferBinding vertexBuffer{};
+        vertexBuffer.buffer = lineBuffer.GetBuffer();
+        SDL_BindGPUGraphicsPipeline(renderPass, linePipeline);
+        SDL_BindGPUVertexBuffers(renderPass, 0, &vertexBuffer, 1);
+        SDL_PushGPUVertexUniformData(commandBuffer, 0, &camera.GetViewProj(), 64);
+        SDL_DrawGPUPrimitives(renderPass, lineBuffer.GetSize(), 1, 0, 0);
+        SDL_EndGPURenderPass(renderPass);
+    }
     SDL_SubmitGPUCommandBuffer(commandBuffer);
 }
 
@@ -407,10 +490,12 @@ int main(int argc, char** argv)
     }
     b2DestroyWorld(worldId);
     solidPolygonBuffer.Destroy(device);
+    lineBuffer.Destroy(device);
     instanceBuffer.Destroy(device);
     SDL_ReleaseGPUTexture(device, depthTexture);
     SDL_ReleaseGPUBuffer(device, cubeBuffer);
     SDL_ReleaseGPUGraphicsPipeline(device, solidPolygonPipeline);
+    SDL_ReleaseGPUGraphicsPipeline(device, linePipeline);
     SDL_ReleaseGPUGraphicsPipeline(device, cubePipeline);
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);

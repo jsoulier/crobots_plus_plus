@@ -124,18 +124,6 @@ public:
         BufferSize = size;
     }
 
-    void Upload(SDL_GPUDevice* device, SDL_GPUCommandBuffer* commandBuffer)
-    {
-        SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commandBuffer);
-        if (!copyPass)
-        {
-            SDL_Log("Failed to begin copy pass: %s", SDL_GetError());
-            return;
-        }
-        Upload(device, copyPass);
-        SDL_EndGPUCopyPass(copyPass);
-    }
-
     SDL_GPUBuffer* GetBuffer() const
     {
         SDL_assert(!Data);

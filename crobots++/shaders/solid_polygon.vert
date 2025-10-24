@@ -1,3 +1,5 @@
+#include "shader.hlsl"
+
 cbuffer UniformBuffer : register(b0, space1)
 {
     float4x4 ViewProj : packoffset(c0);
@@ -20,16 +22,14 @@ struct Output
 
 Output main(Input input)
 {
-    Output output;
     float3 position;
     position.x = input.Position.x * input.Cos - input.Position.z * input.Sin;
     position.y = input.Position.y;
     position.z = input.Position.x * input.Sin + input.Position.z * input.Cos;
     position.x += input.WorldPosition.x;
     position.z += input.WorldPosition.y;
+    Output output;
     output.Position = mul(ViewProj, float4(position, 1.0f));
-    output.Color.r = float((input.Color >> 16) & 0xFFu) / 255.0f;
-    output.Color.g = float((input.Color >> 8) & 0xFFu) / 255.0f;
-    output.Color.b = float((input.Color >> 0) & 0xFFu) / 255.0f;
+    output.Color = GetColor(input.Color);
     return output;
 }

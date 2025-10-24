@@ -13,6 +13,7 @@ public:
     Camera();
     void Update();
     void SetType(CameraType type);
+    void SetCenter(float x, float y);
     void SetRotation(float pitch, float yaw);
     void SetSize(int width, int height);
     void Scroll(float delta);
@@ -27,6 +28,7 @@ public:
 
 private:
     CameraType Type;
+    glm::vec3 Center;
     glm::vec3 Position;
     glm::vec3 Forward;
     glm::vec3 Right;

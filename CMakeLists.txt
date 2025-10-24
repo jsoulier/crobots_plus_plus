@@ -32,7 +32,6 @@ add_executable(engine WIN32
     crobots++/engine/mesh.cpp
     crobots++/engine/pipeline.cpp
     crobots++/engine/registry.cpp
-    crobots++/engine/shader.cpp
 )
 set_target_properties(engine PROPERTIES CXX_STANDARD 23)
 set_target_properties(engine PROPERTIES OUTPUT_NAME crobots++)
@@ -103,5 +102,7 @@ function(add_shader FILE)
 endfunction()
 add_shader(cube.frag)
 add_shader(cube.vert)
+add_shader(line.frag)
+add_shader(line.vert crobots++/shaders/shader.hlsl)
 add_shader(solid_polygon.frag)
-add_shader(solid_polygon.vert)
+add_shader(solid_polygon.vert crobots++/shaders/shader.hlsl)

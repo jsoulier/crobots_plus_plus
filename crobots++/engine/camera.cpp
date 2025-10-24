@@ -14,7 +14,8 @@ static constexpr float kMaxPitch = glm::pi<float>() / 2.0f - 0.01f;
 
 Camera::Camera()
     : Type{CameraType::ArcBall}
-    , Position{0.0f, 0.0f, 0.0f}
+    , Center{}
+    , Position{}
     , Forward{}
     , Right{}
     , Up{}
@@ -28,7 +29,7 @@ Camera::Camera()
     , ZoomSpeed{2.0f}
     , Fov{glm::radians(60.0f)}
     , Near{0.1f}
-    , Far{100.0f}
+    , Far{500.0f}
 {
     SetRotation(0.0f, 0.0f);
 }
@@ -62,6 +63,12 @@ void Camera::SetType(CameraType type)
     }
 }
 
+void Camera::SetCenter(float x, float y)
+{
+    Center = {x, 0.0f, y};
+    Position = Center;
+}
+
 void Camera::SetRotation(float pitch, float yaw)
 {
     Pitch = std::clamp(pitch, -kMaxPitch, kMaxPitch);
@@ -77,7 +84,7 @@ void Camera::SetRotation(float pitch, float yaw)
     switch (Type)
     {
     case CameraType::ArcBall:
-        Position = -Forward * std::max(glm::length(Position), 1.0f);
+        Position = Center - Forward * (glm::distance(Position, Center));
         break;
     }
 }
