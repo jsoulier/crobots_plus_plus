@@ -4,6 +4,8 @@
 
 enum class CameraType
 {
+    Default,
+    TopDown,
     ArcBall,
     FreeCam,
 };
@@ -14,11 +16,11 @@ public:
     Camera();
     void Update();
     void SetType(CameraType type);
-    void SetCenter(float x, float y);
     void SetRotation(float pitch, float yaw);
     void SetSize(int width, int height);
-    void Scroll(float delta);
-    void Rotate(float dx, float dy);
+    void SetCenter(float x, float y);
+    void MouseScroll(float delta);
+    void MouseMotion(float dx, float dy);
     void Move(float dx, float dy, float dz, float dt);
     CameraType GetType() const;
     const glm::vec3& GetPosition() const;
@@ -34,8 +36,7 @@ private:
     glm::vec3 Right;
     glm::vec3 Up;
     glm::mat4 ViewProj;
-    int Width;
-    int Height;
+    glm::ivec2 Size;
     float Pitch;
     float Yaw;
     float MoveSpeed;

@@ -8,7 +8,9 @@
             "program": "${workspaceFolder}/build/bin/crobots++.exe",
             "args": [
                 "--robots",
-                "up_down",
+                "bumper_car",
+                "bumper_car",
+                "engine_failure",
                 "--timestep",
                 "0.016",
             ],

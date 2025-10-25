@@ -40,7 +40,7 @@ public:
     IRobot(IRobot&& other) = delete;
     IRobot& operator=(IRobot&& other) = delete;
     ~IRobot() = default;
-    virtual void Update() = 0;
+    virtual void Update(float deltaTime) = 0;
     
     /**
      * @param speed

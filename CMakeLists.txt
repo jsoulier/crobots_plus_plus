@@ -19,7 +19,7 @@ add_subdirectory(crobots++/external/jsmn)
 add_library(api crobots++/api/src/robot.cpp)
 set_target_properties(api PROPERTIES CXX_STANDARD 23)
 target_include_directories(api PUBLIC crobots++/api/include)
-file(GLOB ROBOTS robots/*.cpp)
+file(GLOB ROBOTS CONFIGURE_DEPENDS robots/*.cpp)
 foreach(PATH ${ROBOTS})
     get_filename_component(NAME ${PATH} NAME_WE)
     add_library(${NAME} MODULE ${PATH})
@@ -28,10 +28,9 @@ foreach(PATH ${ROBOTS})
 endforeach()
 add_executable(engine WIN32
     crobots++/engine/camera.cpp
+    crobots++/engine/engine.cpp
     crobots++/engine/main.cpp
-    crobots++/engine/mesh.cpp
-    crobots++/engine/pipeline.cpp
-    crobots++/engine/registry.cpp
+    crobots++/engine/renderer.cpp
 )
 set_target_properties(engine PROPERTIES CXX_STANDARD 23)
 set_target_properties(engine PROPERTIES OUTPUT_NAME crobots++)
@@ -100,9 +99,9 @@ function(add_shader FILE)
     endif()
     package(${JSON})
 endfunction()
-add_shader(cube.frag)
-add_shader(cube.vert)
-add_shader(line.frag)
-add_shader(line.vert crobots++/shaders/shader.hlsl)
-add_shader(solid_polygon.frag)
-add_shader(solid_polygon.vert crobots++/shaders/shader.hlsl)
+add_shader(color.frag)
+add_shader(color.vert crobots++/shaders/shader.hlsl)
+add_shader(instanced.frag)
+add_shader(instanced.vert)
+add_shader(transformed_color.frag)
+add_shader(transformed_color.vert crobots++/shaders/shader.hlsl)

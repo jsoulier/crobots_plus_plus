@@ -10,8 +10,7 @@ struct Input
     float3 Position : TEXCOORD0;
     uint Color : TEXCOORD1;
     float2 WorldPosition : TEXCOORD2;
-    float Sin : TEXCOORD3;
-    float Cos : TEXCOORD4;
+    float2 Rotation : TEXCOORD3;
 };
 
 struct Output
@@ -23,9 +22,9 @@ struct Output
 Output main(Input input)
 {
     float3 position;
-    position.x = input.Position.x * input.Cos - input.Position.z * input.Sin;
+    position.x = input.Position.x * input.Rotation.y - input.Position.z * input.Rotation.x;
     position.y = input.Position.y;
-    position.z = input.Position.x * input.Sin + input.Position.z * input.Cos;
+    position.z = input.Position.x * input.Rotation.x + input.Position.z * input.Rotation.y;
     position.x += input.WorldPosition.x;
     position.z += input.WorldPosition.y;
     Output output;

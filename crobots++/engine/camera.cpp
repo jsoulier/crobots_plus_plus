@@ -1,7 +1,5 @@
-#define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
-#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -21,8 +19,7 @@ Camera::Camera()
     , Right{}
     , Up{}
     , ViewProj{}
-    , Width{1}
-    , Height{1}
+    , Size{1, 1}
     , Pitch{0.0f}
     , Yaw{0.0f}
     , MoveSpeed{0.001f}
@@ -41,15 +38,19 @@ void Camera::Update()
     glm::mat4 view;
     switch (Type)
     {
+    case CameraType::Default:
     case CameraType::ArcBall:
     case CameraType::FreeCam:
-        proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
+    case CameraType::TopDown:
+        proj = glm::perspective(Fov, float(Size.x) / Size.y, Near, Far);
         break;
     }
     switch (Type)
     {
+    case CameraType::Default:
     case CameraType::ArcBall:
     case CameraType::FreeCam:
+    case CameraType::TopDown:
         view = glm::lookAt(Position, Position + Forward, kUp);
         break;
     }
@@ -61,16 +62,13 @@ void Camera::SetType(CameraType type)
     Type = type;
     switch (Type)
     {
+    case CameraType::TopDown:
+        SetRotation(-kMaxPitch, 0.0f);
+        break;
     case CameraType::ArcBall:
         SetRotation(Pitch, Yaw);
         break;
     }
-}
-
-void Camera::SetCenter(float x, float y)
-{
-    Center = {x, 0.0f, y};
-    Position = Center;
 }
 
 void Camera::SetRotation(float pitch, float yaw)
@@ -95,11 +93,15 @@ void Camera::SetRotation(float pitch, float yaw)
 
 void Camera::SetSize(int width, int height)
 {
-    Width = std::max(width, 1);
-    Height = std::max(height, 1);
+    Size = {std::max(width, 1), std::max(height, 1)};
 }
 
-void Camera::Scroll(float delta)
+void Camera::SetCenter(float x, float y)
+{
+    Center = {x, 0.0f, y};
+}
+
+void Camera::MouseScroll(float delta)
 {
     switch (Type)
     {
@@ -109,18 +111,26 @@ void Camera::Scroll(float delta)
     case CameraType::FreeCam:
         MoveSpeed += std::max(delta * kAcceleration, 0.0f);
         break;
+    case CameraType::TopDown:
+        Position += Forward * delta * MoveSpeed;
+        break;
     }
 }
 
-void Camera::Rotate(float dx, float dy)
+void Camera::MouseMotion(float dx, float dy)
 {
     switch (Type)
     {
+    case CameraType::TopDown:
+        Position += Right * dx * MoveSpeed;
+        Position += Up * dy * MoveSpeed;
+        break;
     case CameraType::ArcBall:
         {
             float speed = RotateSpeed;
             SetRotation(Pitch - dy * speed, Yaw + dx * speed);
         }
+        break;
     case CameraType::FreeCam:
         {
             float speed = RotateSpeed / 5.0f;
@@ -134,8 +144,6 @@ void Camera::Move(float dx, float dy, float dz, float dt)
 {
     switch (Type)
     {
-    case CameraType::ArcBall:
-        break;
     case CameraType::FreeCam:
         Position += Forward * dz * MoveSpeed * dt;
         Position += Right * dx * MoveSpeed * dt;
@@ -161,10 +169,10 @@ const glm::mat4& Camera::GetViewProj() const
 
 int Camera::GetWidth() const
 {
-    return Width;
+    return Size.x;
 }
 
 int Camera::GetHeight() const
 {
-    return Height;
+    return Size.y;
 }

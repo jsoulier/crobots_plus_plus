@@ -1,3 +1,5 @@
+// public domain: https://github.com/jsoulier/voxel_raytracer/blob/main/src/buffer.hpp
+
 #pragma once
 
 #include <SDL3/SDL.h>
@@ -6,7 +8,7 @@
 #include <cmath>
 #include <utility>
 
-template<typename T, SDL_GPUBufferUsageFlags U = SDL_GPU_BUFFERUSAGE_VERTEX>
+template<typename T, SDL_GPUBufferUsageFlags U = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ>
 class DynamicBuffer
 {
 public:
