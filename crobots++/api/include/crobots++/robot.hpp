@@ -50,9 +50,6 @@ public:
     // meters/second
     float GetSpeed();
 
-    // radians
-    float GetRotation();
-
     // meters
     float GetX();
 

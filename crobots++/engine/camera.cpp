@@ -11,9 +11,10 @@
 
 static constexpr glm::vec3 kUp{0.0f, 1.0f, 0.0f};
 static constexpr float kMaxPitch = glm::pi<float>() / 2.0f - 0.01f;
+static constexpr float kAcceleration = 0.001f;
 
 Camera::Camera()
-    : Type{CameraType::ArcBall}
+    : Type{CameraType::FreeCam}
     , Center{}
     , Position{}
     , Forward{}
@@ -24,7 +25,7 @@ Camera::Camera()
     , Height{1}
     , Pitch{0.0f}
     , Yaw{0.0f}
-    , MoveSpeed{0.1f}
+    , MoveSpeed{0.001f}
     , RotateSpeed{0.01f}
     , ZoomSpeed{2.0f}
     , Fov{glm::radians(60.0f)}
@@ -41,12 +42,14 @@ void Camera::Update()
     switch (Type)
     {
     case CameraType::ArcBall:
+    case CameraType::FreeCam:
         proj = glm::perspective(Fov, float(Width) / Height, Near, Far);
         break;
     }
     switch (Type)
     {
     case CameraType::ArcBall:
+    case CameraType::FreeCam:
         view = glm::lookAt(Position, Position + Forward, kUp);
         break;
     }
@@ -59,6 +62,7 @@ void Camera::SetType(CameraType type)
     switch (Type)
     {
     case CameraType::ArcBall:
+        SetRotation(Pitch, Yaw);
         break;
     }
 }
@@ -77,9 +81,9 @@ void Camera::SetRotation(float pitch, float yaw)
     Forward.y = std::sin(Pitch);
     Forward.z = std::cos(Pitch) * std::sin(Yaw);
     Forward = glm::normalize(Forward);
-    Right = glm::cross(kUp, Forward);
+    Right = glm::cross(Forward, kUp);
     Right = glm::normalize(Right);
-    Up = glm::cross(Forward, Right);
+    Up = glm::cross(Right, Forward);
     Up = glm::normalize(Up);
     switch (Type)
     {
@@ -102,15 +106,8 @@ void Camera::Scroll(float delta)
     case CameraType::ArcBall:
         Position += Forward * delta * ZoomSpeed;
         break;
-    }
-}
-
-void Camera::Drag(float dx, float dy)
-{
-    switch (Type)
-    {
-    case CameraType::ArcBall:
-        SetRotation(Pitch - dy * RotateSpeed, Yaw + dx * RotateSpeed);
+    case CameraType::FreeCam:
+        MoveSpeed += std::max(delta * kAcceleration, 0.0f);
         break;
     }
 }
@@ -120,6 +117,15 @@ void Camera::Rotate(float dx, float dy)
     switch (Type)
     {
     case CameraType::ArcBall:
+        {
+            float speed = RotateSpeed;
+            SetRotation(Pitch - dy * speed, Yaw + dx * speed);
+        }
+    case CameraType::FreeCam:
+        {
+            float speed = RotateSpeed / 5.0f;
+            SetRotation(Pitch - dy * speed, Yaw + dx * speed);
+        }
         break;
     }
 }
@@ -129,6 +135,11 @@ void Camera::Move(float dx, float dy, float dz, float dt)
     switch (Type)
     {
     case CameraType::ArcBall:
+        break;
+    case CameraType::FreeCam:
+        Position += Forward * dz * MoveSpeed * dt;
+        Position += Right * dx * MoveSpeed * dt;
+        Position += kUp * dy * MoveSpeed * dt;
         break;
     }
 }

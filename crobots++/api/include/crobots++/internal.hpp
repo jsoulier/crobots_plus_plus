@@ -10,7 +10,6 @@ public:
         : X{0.0f}
         , Y{0.0f}
         , Speed{0.0f}
-        , Rotation{0.0f}
         , Acceleration{1.0f}
     {
     }
@@ -18,7 +17,6 @@ public:
     float X;
     float Y;
     float Speed;
-    float Rotation;
     float Acceleration;
 };
 

@@ -5,6 +5,7 @@
 enum class CameraType
 {
     ArcBall,
+    FreeCam,
 };
 
 class Camera
@@ -17,7 +18,6 @@ public:
     void SetRotation(float pitch, float yaw);
     void SetSize(int width, int height);
     void Scroll(float delta);
-    void Drag(float dx, float dy);
     void Rotate(float dx, float dy);
     void Move(float dx, float dy, float dz, float dt);
     CameraType GetType() const;

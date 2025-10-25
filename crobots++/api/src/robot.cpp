@@ -18,11 +18,6 @@ float IRobot::GetSpeed()
     return {};
 }
 
-float IRobot::GetRotation()
-{
-    return Context->Rotation;
-}
-
 float IRobot::GetX()
 {
     return Context->X;

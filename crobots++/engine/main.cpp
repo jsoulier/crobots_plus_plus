@@ -132,16 +132,22 @@ static bool Init()
         SDL_Log("Failed to create window: %s", SDL_GetError());
         return false;
     }
+    SDL_PropertiesID props = SDL_CreateProperties();
 #ifndef NDEBUG
-    device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, true, nullptr);
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, true);
 #else
-    device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, false, nullptr);
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, false);
 #endif
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN, true);
+    device = SDL_CreateGPUDeviceWithProperties(props);
     if (!device)
     {
         SDL_Log("Failed to create device: %s", SDL_GetError());
         return false;
     }
+    SDL_DestroyProperties(props);
     if (!SDL_ClaimWindowForGPUDevice(device, window))
     {
         SDL_Log("Failed to claim window: %s", SDL_GetError());
@@ -236,6 +242,8 @@ static bool Init()
         shapeDef.material.friction = 0.0f;
         b2Polygon box = b2MakeBox(0.5f, 0.5f);
         b2CreatePolygonShape(robot.BodyId, &shapeDef, &box);
+
+        b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
     }
     {
         b2BodyDef bodyDef = b2DefaultBodyDef();
@@ -267,9 +275,10 @@ static void Tick()
     }
     for (Robot& robot : robots)
     {
+        b2Rot rotation = b2Body_GetRotation(robot.BodyId);
         glm::vec2 velocity;
-        velocity.x = std::cos(robot.Context->Rotation);
-        velocity.y = std::sin(robot.Context->Rotation);
+        velocity.x = rotation.c;
+        velocity.y = rotation.s;
         velocity *= robot.Context->Speed;
         b2Vec2 linearVelocity = b2Body_GetLinearVelocity(robot.BodyId);
         velocity.x -= linearVelocity.x;
@@ -464,8 +473,13 @@ int main(int argc, char** argv)
         return 1;
     }
     bool running = true;
+    uint64_t time2 = SDL_GetTicks();
+    uint64_t time1 = time2;
     while (running)
     {
+        time2 = SDL_GetTicks();
+        float dt = time2 - time1;
+        time1 = time2;
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
@@ -474,10 +488,38 @@ int main(int argc, char** argv)
             case SDL_EVENT_QUIT:
                 running = false;
                 break;
-            case SDL_EVENT_MOUSE_MOTION:
-                if (event.motion.state & SDL_BUTTON_LMASK)
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (camera.GetType() == CameraType::FreeCam)
                 {
-                    camera.Drag(event.motion.xrel, event.motion.yrel);
+                    if (!SDL_GetWindowRelativeMouseMode(window))
+                    {
+                        SDL_SetWindowRelativeMouseMode(window, true);
+                    }
+                }
+                break;
+            case SDL_EVENT_KEY_DOWN:
+                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+                {
+                    if (SDL_GetWindowRelativeMouseMode(window))
+                    {
+                        SDL_SetWindowRelativeMouseMode(window, false);
+                    }
+                }
+                break;
+            case SDL_EVENT_WINDOW_FOCUS_LOST:
+                if (SDL_GetWindowRelativeMouseMode(window))
+                {
+                    SDL_SetWindowRelativeMouseMode(window, false);
+                }
+                break;
+            case SDL_EVENT_MOUSE_MOTION:
+                if (SDL_GetWindowRelativeMouseMode(window))
+                {
+                    camera.Rotate(event.motion.xrel, event.motion.yrel);
+                }
+                else if (event.motion.state & SDL_BUTTON_LMASK)
+                {
+                    camera.Rotate(event.motion.xrel, event.motion.yrel);
                 }
                 break;
             case SDL_EVENT_MOUSE_WHEEL:
@@ -485,6 +527,15 @@ int main(int argc, char** argv)
                 break;
             }
         }
+        const bool* keys = SDL_GetKeyboardState(nullptr);
+        glm::vec3 delta{0.0f};
+        delta.x += keys[SDL_SCANCODE_D];
+        delta.x -= keys[SDL_SCANCODE_A];
+        delta.y += keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_E];
+        delta.y -= keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_Q];
+        delta.z += keys[SDL_SCANCODE_W];
+        delta.z -= keys[SDL_SCANCODE_S];
+        camera.Move(delta.x, delta.y, delta.z, dt);
         Tick();
         Draw();
     }
