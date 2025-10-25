@@ -5,7 +5,7 @@ class UpDownRobot : public crobots::IRobot
 public:
     void Update() override
     {
-        SetSpeed(1.0f);
+        SetSpeed(5.0f);
     }
 };
 

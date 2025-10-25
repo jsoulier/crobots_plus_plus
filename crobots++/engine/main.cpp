@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -71,6 +72,7 @@ static std::vector<Robot> robots;
 static std::vector<Projectile> projectiles;
 static b2WorldId worldId;
 static b2DebugDraw debugDraw;
+static b2BodyId chainBodyId;
 static float timestep = 0.016f;
 
 static bool Parse(int argc, char** argv)
@@ -231,6 +233,10 @@ static bool Init()
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
         bodyDef.position = {kWorldWidth / 2, kWorldWidth / 2};
+        float rotation = 0.6f;
+        bodyDef.rotation.c = std::cosf(rotation);
+        bodyDef.rotation.s = std::sinf(rotation);
+        // bodyDef.angularDamping = 0.5f;
         robot.BodyId = b2CreateBody(worldId, &bodyDef);
         if (B2_IS_NULL(robot.BodyId))
         {
@@ -239,17 +245,17 @@ static bool Init()
         }
         b2ShapeDef shapeDef = b2DefaultShapeDef();
         shapeDef.density = 1.0f;
-        shapeDef.material.friction = 0.0f;
+        // shapeDef.material.friction = 0.0f;
         b2Polygon box = b2MakeBox(0.5f, 0.5f);
         b2CreatePolygonShape(robot.BodyId, &shapeDef, &box);
-
-        b2Body_SetAngularVelocity(robot.BodyId, 0.1f);
+        b2Body_EnableContactEvents(robot.BodyId, true);
+        b2Body_EnableHitEvents(robot.BodyId, true);
     }
     {
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_staticBody;
         bodyDef.position = {0.0f, 0.0f};
-        b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
+        chainBodyId = b2CreateBody(worldId, &bodyDef);
         b2Vec2 points[4] =
         {
             {0.0f, 0.0f},
@@ -257,11 +263,22 @@ static bool Init()
             {kWorldWidth, kWorldWidth},
             {kWorldWidth, 0.0f}
         };
+        b2SurfaceMaterial materials[4]{};
+        for (int i = 0; i < 4; i++)
+        {
+            materials[i].friction = 0.0f;
+            materials[i].restitution = 1.0f;
+        }
         b2ChainDef chainDef = b2DefaultChainDef();
         chainDef.points = points;
         chainDef.count = 4;
+        chainDef.materials = materials;
+        chainDef.materialCount = 4;
         chainDef.isLoop = true;
-        b2CreateChain(bodyId, &chainDef);
+        b2CreateChain(chainBodyId, &chainDef);
+        // TODO:
+        b2Body_EnableContactEvents(chainBodyId, true);
+        b2Body_EnableHitEvents(chainBodyId, true);
     }
     camera.SetCenter(kWorldWidth / 2, kWorldWidth / 2);
     return true;
@@ -299,6 +316,47 @@ static void Tick()
         b2Body_ApplyForceToCenter(robot.BodyId, linearForce, true);
     }
     b2World_Step(worldId, timestep, 4);
+    b2ContactEvents contactEvents = b2World_GetContactEvents(worldId);
+    for (int i = 0; i < contactEvents.hitCount; i++)
+    {
+        b2ContactHitEvent& event = contactEvents.hitEvents[i];
+        if (!b2Shape_IsValid(event.shapeIdA) || !b2Shape_IsValid(event.shapeIdB))
+        {
+            continue;
+        }
+        b2BodyId body1 = b2Shape_GetBody(event.shapeIdA);
+        b2BodyId body2 = b2Shape_GetBody(event.shapeIdB);
+        auto updateTransform = [](b2BodyId body)
+        {
+            b2Vec2 position = b2Body_GetPosition(body);
+            b2Vec2 velocity = b2Body_GetLinearVelocity(body);
+            glm::vec2 glmVelocity;
+            glmVelocity.x = velocity.x;
+            glmVelocity.y = velocity.y;
+            if (glm::length(glmVelocity) < std::numeric_limits<float>::epsilon())
+            {
+                return;
+            }
+            glmVelocity = glm::normalize(glmVelocity);
+            b2Rot rotation;
+            rotation.c = glmVelocity.x;
+            rotation.s = glmVelocity.y;
+            b2Body_SetTransform(body, position, rotation);
+            b2Body_SetAngularVelocity(body, 0.0f);
+            // b2Transform transform;
+            // transform.p = position;
+            // transform.q = rotation;
+            // b2Body_SetTargetTransform(body, transform, timestep);
+        };
+        if (B2_ID_EQUALS(body1, chainBodyId))
+        {
+            updateTransform(body2);
+        }
+        else if (B2_ID_EQUALS(body2, chainBodyId))
+        {
+            updateTransform(body1);
+        }
+    }
     for (Robot& robot : robots)
     {
         b2Vec2 position = b2Body_GetPosition(robot.BodyId);
